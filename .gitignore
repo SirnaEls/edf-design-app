@@ -1,0 +1,10 @@
+# Secrets — ne JAMAIS commiter
+.env
+
+# Dépendances
+node_modules/
+
+# Artefacts
+*.log
+*.zip
+.DS_Store

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EDF Design</title>
+<style>
+  :root {
+    --bg: #101114;
+    --panel: #17181c;
+    --panel-2: #1d1f24;
+    --border: #2a2c33;
+    --text: #e8e9ec;
+    --text-dim: #8b8e98;
+    --accent: #4d7cfe;
+    --accent-hover: #6890ff;
+    --danger: #ff5c5c;
+    --radius: 10px;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", Inter, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+  }
+
+  /* ---- Header ---- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .logo {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-size: 15px;
+  }
+  .logo span { color: var(--accent); }
+  .badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 3px 10px;
+  }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  /* ---- Layout ---- */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: 0;
+  }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } }
+
+  /* ---- Panneau gauche ---- */
+  aside {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .prompt-zone { padding: 16px; border-bottom: 1px solid var(--border); }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+  textarea {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 12px;
+    font: inherit;
+    line-height: 1.5;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+
+  button {
+    font: inherit;
+    border: none;
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; margin-top: 10px; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.5; cursor: wait; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 7px 12px;
+    font-weight: 500;
+    font-size: 13px;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text-dim); }
+
+  .hint { font-size: 12px; color: var(--text-dim); margin-top: 10px; line-height: 1.5; }
+
+  /* ---- Versions ---- */
+  .versions { flex: 1; overflow-y: auto; padding: 16px; }
+  .versions h2 { font-size: 12px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .version-item {
+    width: 100%;
+    text-align: left;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    color: var(--text);
+    font-weight: 400;
+    display: block;
+  }
+  .version-item:hover { border-color: var(--text-dim); }
+  .version-item.active { border-color: var(--accent); background: var(--panel-2); }
+  .version-item .v-num { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .version-item .v-prompt {
+    display: block;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .empty { color: var(--text-dim); font-size: 13px; line-height: 1.6; }
+
+  /* ---- Préview ---- */
+  .preview {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background:
+      linear-gradient(45deg, #16171b 25%, transparent 25%, transparent 75%, #16171b 75%),
+      linear-gradient(45deg, #16171b 25%, #131418 25%, #131418 75%, #16171b 75%);
+    background-size: 24px 24px;
+    background-position: 0 0, 12px 12px;
+  }
+  .preview-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .preview-bar .title { font-size: 13px; color: var(--text-dim); font-family: var(--mono); }
+  .preview-bar .actions { margin-left: auto; display: flex; gap: 8px; }
+  iframe { flex: 1; border: none; background: #fff; width: 100%; }
+  iframe.hidden, .state.hidden { display: none; }
+
+  /* ---- États ---- */
+  .state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 40px;
+    text-align: center;
+  }
+  .state p { color: var(--text-dim); max-width: 420px; line-height: 1.6; }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
+  .timer { font-family: var(--mono); font-size: 13px; color: var(--text-dim); }
+  .error-box {
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    color: var(--danger);
+    padding: 12px 16px;
+    max-width: 480px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">EDF <span>Design</span></div>
+  <div class="badge" id="modelBadge">portail IAG · stream tolérant</div>
+  <div class="header-actions">
+    <button class="btn-ghost" id="copyBtn" disabled>Copier le code</button>
+    <button class="btn-ghost" id="downloadBtn" disabled>Télécharger .html</button>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <div class="prompt-zone">
+      <label for="prompt">Décris l'interface ou la modification</label>
+      <textarea id="prompt" placeholder="Ex : Dashboard de suivi des API avec liste des environnements, statuts de santé et graphique d'appels sur 7 jours"></textarea>
+      <button class="btn-primary" id="generateBtn">Générer</button>
+      <p class="hint">Chaque génération prend 20 à 60 s (appel complet, sans streaming). Sélectionne une version puis décris un changement pour itérer dessus.</p>
+    </div>
+    <div class="versions">
+      <h2>Versions</h2>
+      <div id="versionList"><p class="empty">Aucune version pour l'instant. La première génération apparaîtra ici.</p></div>
+    </div>
+  </aside>
+
+  <section class="preview">
+    <div class="preview-bar">
+      <span class="title" id="previewTitle">preview</span>
+      <div class="actions">
+        <button class="btn-ghost" id="openTabBtn" disabled>Ouvrir dans un onglet</button>
+      </div>
+    </div>
+
+    <div class="state" id="idleState">
+      <p>Décris une interface à gauche et lance la génération.<br />Le résultat s'affichera ici, itérable version par version.</p>
+    </div>
+
+    <div class="state hidden" id="loadingState">
+      <div class="spinner" role="status" aria-label="Génération en cours"></div>
+      <p>Génération en cours via le portail IAG…</p>
+      <span class="timer" id="timer">0 s</span>
+    </div>
+
+    <div class="state hidden" id="errorState">
+      <div class="error-box" id="errorMsg"></div>
+      <button class="btn-ghost" id="retryBtn">Réessayer</button>
+    </div>
+
+    <iframe id="frame" class="hidden" title="Prévisualisation de l'interface générée"></iframe>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const versions = []; // { prompt, html }
+  let activeIndex = -1;
+  let lastPrompt = "";
+  let timerInterval = null;
+
+  function setState(name) {
+    ["idleState", "loadingState", "errorState"].forEach((s) => $(s).classList.add("hidden"));
+    $("frame").classList.add("hidden");
+    if (name === "frame") $("frame").classList.remove("hidden");
+    else $(name).classList.remove("hidden");
+  }
+
+  function startTimer() {
+    const start = Date.now();
+    $("timer").textContent = "0 s";
+    timerInterval = setInterval(() => {
+      $("timer").textContent = Math.round((Date.now() - start) / 1000) + " s";
+    }, 1000);
+  }
+  function stopTimer() { clearInterval(timerInterval); }
+
+  function renderVersions() {
+    const list = $("versionList");
+    if (!versions.length) return;
+    list.innerHTML = "";
+    versions.forEach((v, i) => {
+      const btn = document.createElement("button");
+      btn.className = "version-item" + (i === activeIndex ? " active" : "");
+      btn.innerHTML = `<span class="v-num">v${i + 1}</span><span class="v-prompt"></span>`;
+      btn.querySelector(".v-prompt").textContent = v.prompt;
+      btn.addEventListener("click", () => selectVersion(i));
+      list.appendChild(btn);
+    });
+  }
+
+  let currentBlobUrl = null;
+
+  function selectVersion(i) {
+    activeIndex = i;
+    // Blob URL plutôt que srcdoc : contexte d'exécution normal, Tailwind CDN
+    // fonctionne exactement comme dans "Ouvrir dans un onglet"
+    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+    currentBlobUrl = URL.createObjectURL(new Blob([versions[i].html], { type: "text/html" }));
+    $("frame").src = currentBlobUrl;
+    $("previewTitle").textContent = `v${i + 1} — ${versions[i].prompt.slice(0, 60)}`;
+    ["copyBtn", "downloadBtn", "openTabBtn"].forEach((id) => ($(id).disabled = false));
+    setState("frame");
+    renderVersions();
+  }
+
+  async function generate() {
+    const prompt = $("prompt").value.trim();
+    if (!prompt) return;
+    lastPrompt = prompt;
+    $("generateBtn").disabled = true;
+    setState("loadingState");
+    startTimer();
+
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          currentHtml: activeIndex >= 0 ? versions[activeIndex].html : null,
+          history: versions.map((v) => v.prompt),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur inconnue");
+
+      versions.push({ prompt, html: data.html });
+      $("prompt").value = "";
+      selectVersion(versions.length - 1);
+    } catch (err) {
+      $("errorMsg").textContent = err.message;
+      setState("errorState");
+    } finally {
+      stopTimer();
+      $("generateBtn").disabled = false;
+    }
+  }
+
+  $("generateBtn").addEventListener("click", generate);
+  $("prompt").addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") generate();
+  });
+  $("retryBtn").addEventListener("click", () => {
+    $("prompt").value = lastPrompt;
+    generate();
+  });
+
+  $("copyBtn").addEventListener("click", async () => {
+    await navigator.clipboard.writeText(versions[activeIndex].html);
+    $("copyBtn").textContent = "Copié ✓";
+    setTimeout(() => ($("copyBtn").textContent = "Copier le code"), 1500);
+  });
+
+  $("downloadBtn").addEventListener("click", () => {
+    const blob = new Blob([versions[activeIndex].html], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `edf-design-v${activeIndex + 1}.html`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $("openTabBtn").addEventListener("click", () => {
+    const blob = new Blob([versions[activeIndex].html], { type: "text/html" });
+    window.open(URL.createObjectURL(blob), "_blank");
+  });
+</script>
+</body>
+</html>
