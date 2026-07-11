@@ -9,3 +9,6 @@ node_modules/
 *.zip
 .DS_Store
 .superpowers/
+
+# Données persistées localement
+data/

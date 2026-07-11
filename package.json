@@ -5,7 +5,8 @@
   "description": "Alternative interne aux outils de design IA — génération d'UI via le portail IAG EDF, en non-stream",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
