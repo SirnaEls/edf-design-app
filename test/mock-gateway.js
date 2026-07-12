@@ -30,8 +30,12 @@ function startMockGateway(port = 0) {
 
     const pieces = PAGE.match(/[\s\S]{1,40}/g);
     let i = 0;
+    let closed = false;
     res.write(": bruit-keepalive de la gateway\n\n"); // ligne de bruit SSE
     const timer = setInterval(() => {
+      // Si le client s'est déconnecté, on ne fait rien
+      if (closed) return;
+
       // Rafale bufferisée : 3 chunks d'un coup, chacun avec un id différent
       res.write(pieces.slice(i, i + 3).map(sseChunk).join(""));
       i += 3;
@@ -43,6 +47,15 @@ function startMockGateway(port = 0) {
         res.end();
       }
     }, 50);
+
+    // Client parti en cours de stream : on arrête d'émettre
+    res.on("close", () => {
+      closed = true;
+      clearInterval(timer);
+    });
+
+    // Erreur tardive sur socket : on la supprime pour ne pas planter
+    res.on("error", () => {});
   });
   return new Promise((resolve) => {
     server.listen(port, () => resolve({ server, port: server.address().port }));
