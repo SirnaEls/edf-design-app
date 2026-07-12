@@ -6,12 +6,17 @@ Alternative interne aux outils de design IA pour le lab EDF. Génère des interf
 
 ```
 public/index.html  →  POST /api/generate  →  server.js  →  Portail IAG (stream:true, parseur tolérant)
-     (front)              (JSON complet)      (Express)        (SSE sale accepté)
+     (front)         GET/DELETE /api/sessions*  (Express)      (SSE sale accepté)
+                              │
+                              ▼
+                     store.js → data/sessions/*.json
+                     (un fichier par session, écriture atomique tmp+rename)
 ```
 
-- **server.js** : proxy Express. La clé API ne quitte JAMAIS le serveur.
-- **public/index.html** : front vanilla (pas de framework) — prompt, préview iframe, historique de versions, export.
-- **.env** : `IAG_BASE_URL`, `IAG_API_KEY`, `IAG_MODEL`, `PORT`, `TIMEOUT_MS`. Jamais commité.
+- **server.js** : proxy Express. La clé API ne quitte JAMAIS le serveur. Source de vérité des sessions : relit toujours le disque via `store.js`, le front n'envoie ni `currentHtml` ni `history`.
+- **store.js** : persistance des sessions en JSON sur disque (`data/sessions/<id>.json`). Un fichier par session (une session corrompue n'affecte pas les autres), écriture atomique (fichier `.tmp` puis `rename`) pour survivre à un arrêt du serveur en pleine écriture.
+- **public/index.html** : front vanilla (pas de framework) — prompt, préview iframe (Blob URL), liste des sessions (rechargement auto au démarrage), historique de versions, export.
+- **.env** : `IAG_BASE_URL`, `IAG_API_KEY`, `IAG_MODEL`, `PORT`, `TIMEOUT_MS`, `DATA_DIR` (optionnel, surcharge l'emplacement de `data/sessions/`). Jamais commité.
 
 ## Contraintes gateway — NE PAS CASSER
 
@@ -33,15 +38,22 @@ Ces trois décisions résultent de bugs réels rencontrés et résolus. Toute mo
 
 C'est le levier qualité n°1 des générations. Il impose : fichier HTML unique complet, Tailwind CDN, minimalisme premium, RGAA, contenu réaliste en français, fichier COMPLET renvoyé lors des itérations (pas de diff). Pour spécialiser l'outil (design system Self4All, règles Figma-ready), enrichir ce prompt.
 
-## Roadmap envisagée (non commencée)
+## Roadmap envisagée
 
-1. Persistance des versions côté serveur (JSON sur disque) — survivre aux restarts.
+1. ~~Persistance des versions côté serveur (JSON sur disque) — survivre aux restarts.~~ Fait : `store.js` + sessions/versions dans l'UI.
 2. Injection de design systems par projet (Self4All, SI'Nergie) — sélecteur dans l'UI, fragments de system prompt.
 3. Export direct .zip multi-fichiers si les générations dépassent le fichier unique.
 
 ## Tests
 
-Le flux a été validé contre un mock reproduisant la gateway sale (ids changeants, rafales 800ms, bruit SSE, chunk usage-only). Pour retester : créer un mock Express sur :9999 qui streame des chunks avec ids aléatoires, lancer le serveur avec `IAG_BASE_URL=http://localhost:9999/v1`, vérifier que le HTML ressort intact.
+`npm test` (node:test) : couvre `store.js` (persistance, écriture atomique, ids) et un test d'intégration API contre un mock gateway sale intégré (`test/mock-gateway.js` : ids de chunks changeants, rafales bufferisées, bruit SSE, chunk usage-only). Vérifie que `POST /api/generate` et les routes `GET/DELETE /api/sessions*` respectent le contrat malgré ce stream non conforme.
+
+Pour une vérification manuelle en conditions réelles (navigateur, redémarrage du serveur) :
+```bash
+node test/mock-gateway.js &
+DATA_DIR=/tmp/edf-verif IAG_BASE_URL=http://localhost:9999/v1 IAG_API_KEY=x IAG_MODEL=x node server.js
+```
+Générer, itérer, rafraîchir la page, puis couper et relancer le serveur (Ctrl-C) : les sessions et versions doivent survivre.
 
 ## Sécurité
 
