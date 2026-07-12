@@ -5,6 +5,7 @@
 require("dotenv").config();
 const express = require("express");
 const path = require("path");
+const store = require("./store");
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -88,14 +89,36 @@ function extractHtml(text) {
 }
 
 app.post("/api/generate", async (req, res) => {
-  const { prompt, currentHtml, history = [] } = req.body || {};
+  const { prompt, sessionId, versionIndex } = req.body || {};
   if (!prompt || typeof prompt !== "string") {
     return res.status(400).json({ error: "Prompt manquant." });
   }
 
+  // Le serveur est la source de vérité : on relit la session depuis le disque
+  let session;
+  if (sessionId != null) {
+    if (!store.isValidId(sessionId)) {
+      return res.status(400).json({ error: "Identifiant de session invalide." });
+    }
+    session = await store.loadSession(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Session introuvable. Elle a peut-être été supprimée." });
+    }
+  } else {
+    session = store.newSession(prompt); // rien n'est écrit tant que la génération n'a pas réussi
+  }
+
+  // Version active : l'index demandé s'il est valide, sinon la dernière
+  const count = session.versions.length;
+  const idx =
+    Number.isInteger(versionIndex) && versionIndex >= 0 && versionIndex < count
+      ? versionIndex
+      : count - 1;
+  const currentHtml = idx >= 0 ? session.versions[idx].html : null;
+
   // Reconstitue la conversation : historique + code courant + nouvelle instruction
   const messages = [{ role: "system", content: SYSTEM_PROMPT }];
-  for (const turn of history.slice(-6)) {
+  for (const turn of session.versions.map((v) => v.prompt).slice(-6)) {
     // On ne renvoie que les instructions passées (pas les gros HTML) pour limiter le contexte
     messages.push({ role: "user", content: turn });
   }
@@ -150,7 +173,18 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    res.json({ html });
+    // Succès seulement : on ajoute la version et on persiste (écriture atomique)
+    const version = { prompt, html, createdAt: new Date().toISOString() };
+    session.versions.push(version);
+    session.updatedAt = version.createdAt;
+    await store.saveSession(session);
+
+    res.json({
+      sessionId: session.id,
+      title: session.title,
+      versionIndex: session.versions.length - 1,
+      version,
+    });
   } catch (err) {
     if (err.name === "AbortError") {
       return res.status(504).json({
@@ -164,8 +198,38 @@ app.post("/api/generate", async (req, res) => {
   }
 });
 
-const PORT = Number(process.env.PORT || 3000);
-app.listen(PORT, () => {
-  console.log(`EDF Design prêt → http://localhost:${PORT}`);
-  console.log(`Portail : ${PORTAL_URL} · Modèle : ${MODEL} · Mode : stream tolérant (anti-504)`);
+app.get("/api/sessions", async (_req, res) => {
+  res.json(await store.listSessions());
 });
+
+app.get("/api/sessions/:id", async (req, res) => {
+  if (!store.isValidId(req.params.id)) {
+    return res.status(400).json({ error: "Identifiant de session invalide." });
+  }
+  const session = await store.loadSession(req.params.id);
+  if (!session) {
+    return res.status(404).json({ error: "Session introuvable. Elle a peut-être été supprimée." });
+  }
+  res.json(session);
+});
+
+app.delete("/api/sessions/:id", async (req, res) => {
+  if (!store.isValidId(req.params.id)) {
+    return res.status(400).json({ error: "Identifiant de session invalide." });
+  }
+  if (!(await store.deleteSession(req.params.id))) {
+    return res.status(404).json({ error: "Session introuvable. Elle a peut-être été supprimée." });
+  }
+  res.json({ ok: true });
+});
+
+module.exports = { app };
+
+// Démarrage direct uniquement (les tests importent { app } sans écouter)
+if (require.main === module) {
+  const PORT = Number(process.env.PORT || 3000);
+  app.listen(PORT, () => {
+    console.log(`EDF Design prêt → http://localhost:${PORT}`);
+    console.log(`Portail : ${PORTAL_URL} · Modèle : ${MODEL} · Mode : stream tolérant (anti-504)`);
+  });
+}
