@@ -358,19 +358,24 @@
   }
 
   async function openSession(id) {
-    const res = await fetch(`/api/sessions/${id}`);
-    if (!res.ok) {
-      // Supprimée entre-temps (fichier retiré à la main) : on la retire de la liste
-      sessions = sessions.filter((s) => s.id !== id);
-      if (currentSessionId === id) newDesign(); else renderSessions();
-      return;
+    try {
+      const res = await fetch(`/api/sessions/${id}`);
+      if (!res.ok) {
+        // Supprimée entre-temps (fichier retiré à la main) : on la retire de la liste
+        sessions = sessions.filter((s) => s.id !== id);
+        if (currentSessionId === id) newDesign(); else renderSessions();
+        return;
+      }
+      const s = await res.json();
+      currentSessionId = s.id;
+      versions = s.versions;
+      renderSessions();
+      if (versions.length) selectVersion(versions.length - 1);
+      else { activeIndex = -1; renderVersions(); setState("idleState"); }
+    } catch (err) {
+      $("errorMsg").textContent = `Impossible de charger la session : ${err.message}`;
+      setState("errorState");
     }
-    const s = await res.json();
-    currentSessionId = s.id;
-    versions = s.versions;
-    renderSessions();
-    if (versions.length) selectVersion(versions.length - 1);
-    else { activeIndex = -1; renderVersions(); setState("idleState"); }
   }
 
   function newDesign() {
