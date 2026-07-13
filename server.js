@@ -57,7 +57,7 @@ Règles strictes :
  * - fonctionne même si la gateway bufferise et envoie tout d'un bloc
  * On accumule simplement tout delta.content rencontré.
  */
-async function consumeStreamTolerantly(response) {
+async function consumeStreamTolerantly(response, onProgress) {
   const decoder = new TextDecoder();
   let buffer = "";
   let text = "";
@@ -82,6 +82,7 @@ async function consumeStreamTolerantly(response) {
         // ligne non-JSON (keep-alive, commentaire SSE, bruit gateway) → on ignore
       }
     }
+    if (onProgress) onProgress(text.length);
   }
   // Traite un éventuel reliquat (réponse non-stream envoyée d'un bloc sans saut de ligne final)
   const rest = buffer.trim();
@@ -105,8 +106,22 @@ function extractHtml(text) {
   return text.trim();
 }
 
+/**
+ * Progression des générations en cours, pour le compteur du fil côté front.
+ * En mémoire uniquement (outil mono-utilisateur) ; n'expose ni prompt ni HTML.
+ */
+const progressMap = new Map(); // generationId → { phase, chars, startedAt }
+const PROGRESS_TTL_MS = 10 * 60 * 1000;
+const isValidGenerationId = (id) => typeof id === "string" && /^[a-z0-9-]{8,64}$/.test(id);
+// Balai : filet de sécurité si un handler meurt avant son finally. unref()
+// pour ne pas retenir le process (les tests importent { app } puis sortent).
+setInterval(() => {
+  const seuil = Date.now() - PROGRESS_TTL_MS;
+  for (const [id, p] of progressMap) if (p.startedAt < seuil) progressMap.delete(id);
+}, 60 * 1000).unref();
+
 app.post("/api/generate", async (req, res) => {
-  const { prompt, sessionId, versionIndex } = req.body || {};
+  const { prompt, sessionId, versionIndex, generationId } = req.body || {};
   if (!prompt || typeof prompt !== "string") {
     return res.status(400).json({ error: "Prompt manquant." });
   }
@@ -124,6 +139,10 @@ app.post("/api/generate", async (req, res) => {
   } else {
     session = store.newSession(prompt); // rien n'est écrit tant que la génération n'a pas réussi
   }
+
+  // Suivi de progression : optionnel, jamais bloquant (id invalide → ignoré)
+  const trackId = isValidGenerationId(generationId) ? generationId : null;
+  if (trackId) progressMap.set(trackId, { phase: "attente", chars: 0, startedAt: Date.now() });
 
   // Version active : l'index demandé s'il est valide, sinon la dernière
   const count = session.versions.length;
@@ -181,7 +200,16 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    const text = await consumeStreamTolerantly(upstream);
+    const text = await consumeStreamTolerantly(upstream, trackId
+      ? (chars) => {
+          const p = progressMap.get(trackId);
+          if (p) { p.phase = "génération"; p.chars = chars; }
+        }
+      : undefined);
+    if (trackId) {
+      const p = progressMap.get(trackId);
+      if (p) p.phase = "extraction";
+    }
     const html = extractHtml(text);
     if (!html.toLowerCase().includes("<html")) {
       return res.status(502).json({
@@ -195,6 +223,10 @@ app.post("/api/generate", async (req, res) => {
     session.versions.push(version);
     session.updatedAt = version.createdAt;
     await store.saveSession(session);
+    if (trackId) {
+      const p = progressMap.get(trackId);
+      if (p) p.phase = "enregistré";
+    }
 
     res.json({
       sessionId: session.id,
@@ -212,6 +244,7 @@ app.post("/api/generate", async (req, res) => {
     res.status(500).json({ error: `Erreur réseau vers le portail : ${err.message}` });
   } finally {
     clearTimeout(timer);
+    if (trackId) progressMap.delete(trackId);
   }
 });
 
@@ -246,6 +279,12 @@ app.delete("/api/sessions/:id", wrap(async (req, res) => {
   }
   res.json({ ok: true });
 }));
+
+app.get("/api/progress/:id", (req, res) => {
+  const p = progressMap.get(req.params.id);
+  if (!p) return res.status(404).json({ error: "Génération inconnue ou terminée." });
+  res.json({ phase: p.phase, chars: p.chars, elapsedMs: Date.now() - p.startedAt });
+});
 
 module.exports = { app };
 

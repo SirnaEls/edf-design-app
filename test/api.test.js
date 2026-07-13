@@ -88,3 +88,34 @@ test("DELETE supprime la session", async () => {
   const list = await (await fetch(base + "/api/sessions")).json();
   assert.ok(!list.some((s) => s.id === sid));
 });
+
+test("progress : 404 sur id inconnu", async () => {
+  const res = await fetch(`${base}/api/progress/id-inconnu-123`);
+  assert.equal(res.status, 404);
+});
+
+test("progress : compteur vivant pendant la génération, puis 404 une fois finie", async () => {
+  const gid = `test-progress-${Date.now()}`;
+  const pending = post("/api/generate", { prompt: "Page de profil", generationId: gid });
+  // Le mock streame par rafales de 50 ms : on sonde vite pour attraper la phase « génération »
+  let vu = null;
+  for (let i = 0; i < 200 && !vu; i++) {
+    await new Promise((r) => setTimeout(r, 15));
+    const pr = await fetch(`${base}/api/progress/${gid}`);
+    if (pr.ok) {
+      const j = await pr.json();
+      if (j.phase === "génération" && j.chars > 0) vu = j;
+    }
+  }
+  assert.ok(vu, "le poll doit voir phase=génération avec chars > 0 pendant le stream");
+  assert.ok(vu.elapsedMs >= 0);
+  const res = await pending;
+  assert.equal(res.status, 200);
+  assert.equal((await fetch(`${base}/api/progress/${gid}`)).status, 404, "entrée nettoyée après la fin");
+});
+
+test("generationId au format invalide : ignoré, la génération aboutit", async () => {
+  const res = await post("/api/generate", { prompt: "Page contact", generationId: "PAS BON !!" });
+  assert.equal(res.status, 200);
+  assert.ok((await res.json()).sessionId);
+});
