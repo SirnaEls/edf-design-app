@@ -11,7 +11,7 @@ const app = express();
 app.use(express.json({ limit: "10mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const PORTAL_URL = process.env.IAG_BASE_URL; // ex: https://exemple-portail-interne/v1
+const PORTAL_URL = process.env.IAG_BASE_URL; // URL de base du portail, /v1 inclus
 const API_KEY = process.env.IAG_API_KEY;
 const MODEL = process.env.IAG_MODEL; // nom exact du modèle côté portail
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MS || 600000); // 10 min
