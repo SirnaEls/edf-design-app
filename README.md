@@ -25,7 +25,7 @@ Puis ouvre **http://localhost:3000**.
 ## Utilisation
 
 1. Décris une interface dans le champ de gauche → **Générer** (⌘/Ctrl+Entrée).
-2. La préview s'affiche dans l'iframe (20–60 s par génération, c'est normal : appel complet sans streaming).
+2. La préview s'affiche dans l'iframe (20–60 s par génération, c'est normal : le résultat arrive d'un bloc une fois la génération terminée).
 3. Pour itérer : garde la version sélectionnée, décris la modification, régénère. Le code courant est renvoyé au modèle avec ta consigne.
 4. Chaque génération crée une **version** dans l'historique — clique pour revenir en arrière.
 5. **Copier le code** ou **Télécharger .html** pour récupérer le livrable.

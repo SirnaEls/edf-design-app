@@ -1,5 +1,5 @@
 /**
- * EDF Design — proxy backend non-stream vers le portail IAG
+ * EDF Design — proxy vers le portail IAG (stream tolérant côté portail, JSON complet côté navigateur)
  * La clé API ne quitte jamais ce serveur.
  */
 require("dotenv").config();
