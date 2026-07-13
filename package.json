@@ -2,7 +2,7 @@
   "name": "edf-design",
   "version": "1.0.0",
   "private": true,
-  "description": "Alternative interne aux outils de design IA — génération d'UI via le portail IAG EDF, en non-stream",
+  "description": "Alternative interne aux outils de design IA — génération d'UI via le portail IAG EDF",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

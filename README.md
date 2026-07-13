@@ -10,9 +10,11 @@ Alternative interne aux outils de design IA. Génère des interfaces web (HTML a
 # 1. Installer (une seule fois)
 npm install
 
-# 2. Configurer
-cp .env.example .env
-# → ouvre .env et renseigne IAG_BASE_URL, IAG_API_KEY, IAG_MODEL
+# 2. Configurer : crée un fichier .env à la racine avec
+#    IAG_BASE_URL=…/v1   (URL de base du portail IAG, /v1 inclus)
+#    IAG_API_KEY=…       (ta clé API fournie par EDF)
+#    IAG_MODEL=…         (nom exact du modèle côté portail)
+#    PORT et TIMEOUT_MS optionnels (défauts : 3000 / 600000)
 
 # 3. Lancer
 npm start
