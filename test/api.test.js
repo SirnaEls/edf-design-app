@@ -120,11 +120,32 @@ test("generationId au format invalide : ignoré, la génération aboutit", async
   assert.ok((await res.json()).sessionId);
 });
 
-test("generationId déjà en cours : la 2e génération aboutit sans casser le suivi de la 1re", async () => {
+test("generationId déjà en cours : la 2e génération n'écrase pas le suivi de la 1re", async () => {
   const gid = `test-doublon-${Date.now()}`;
   const p1 = post("/api/generate", { prompt: "Page A", generationId: gid });
-  await new Promise((r) => setTimeout(r, 30)); // laisse la 1re s'enregistrer
+
+  // Attend que la 1re génération soit enregistrée dans le suivi
+  let avant = null;
+  for (let i = 0; i < 200 && !avant; i++) {
+    await new Promise((r) => setTimeout(r, 5));
+    const pr = await fetch(`${base}/api/progress/${gid}`);
+    if (pr.ok) avant = await pr.json();
+  }
+  assert.ok(avant, "le suivi de la 1re génération doit être enregistré");
+
+  // 2e génération avec le MÊME id pendant que la 1re est en vol
   const p2 = post("/api/generate", { prompt: "Page B", generationId: gid });
+  await new Promise((r) => setTimeout(r, 30));
+
+  // Si le garde-fou régressait, la 2e réinitialiserait l'entrée (elapsedMs ~0).
+  // L'entrée peut aussi avoir déjà été nettoyée (1re finie) : un 404 est acceptable,
+  // seul un elapsedMs qui recule est une régression.
+  const pr = await fetch(`${base}/api/progress/${gid}`);
+  if (pr.ok) {
+    const apres = await pr.json();
+    assert.ok(apres.elapsedMs >= avant.elapsedMs, "le suivi de la 1re ne doit pas être réinitialisé par la 2e");
+  }
+
   const [r1, r2] = await Promise.all([p1, p2]);
   assert.equal(r1.status, 200);
   assert.equal(r2.status, 200);
