@@ -3,7 +3,7 @@
  * Valide le contrat API ET que le parseur tolérant reconstitue le HTML
  * intact malgré les ids changeants / rafales / bruit SSE.
  */
-const { test, before } = require("node:test");
+const { test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const { mkdtempSync } = require("fs");
 const os = require("os");
@@ -18,13 +18,20 @@ process.env.IAG_MODEL = "modele-de-test";
 
 let base; // http://localhost:<port> du serveur sous test
 let sid;  // sessionId créé au premier test, réutilisé ensuite
+let mockServer; // mock gateway, à fermer après
+let mainServer; // serveur principal, à fermer après
 
 before(async () => {
-  const mock = await startMockGateway();
-  process.env.IAG_BASE_URL = `http://localhost:${mock.port}/v1`;
+  mockServer = await startMockGateway();
+  process.env.IAG_BASE_URL = `http://localhost:${mockServer.port}/v1`;
   const { app } = require("../server");
-  const server = await new Promise((r) => { const s = app.listen(0, () => r(s)); });
-  base = `http://localhost:${server.address().port}`;
+  mainServer = await new Promise((r) => { const s = app.listen(0, () => r(s)); });
+  base = `http://localhost:${mainServer.address().port}`;
+});
+
+after(async () => {
+  if (mainServer) mainServer.close();
+  if (mockServer?.server) mockServer.server.close();
 });
 
 const post = (url, body) =>
