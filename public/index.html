@@ -247,17 +247,30 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
-  .timer { font-family: var(--mono); font-size: 13px; color: var(--text-dim); }
-  .error-box {
+  .activity {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+  .activity .spinner { width: 16px; height: 16px; border-width: 2px; flex-shrink: 0; }
+  .activity .a-label { font-size: 13px; }
+  .activity .a-meta { font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); margin-left: auto; white-space: nowrap; }
+  .card-error {
+    align-self: stretch;
     background: color-mix(in srgb, var(--danger) 10%, transparent);
     border: 1px solid var(--danger);
     border-radius: var(--radius);
+    padding: 10px 12px;
     color: var(--danger);
-    padding: 12px 16px;
-    max-width: 480px;
     font-size: 13px;
     line-height: 1.5;
   }
+  .card-error .btn-ghost { margin-top: 8px; color: var(--text); }
 </style>
 </head>
 <body>
@@ -309,17 +322,6 @@
       <p>Décris une interface à gauche et lance la génération.<br />Le résultat s'affichera ici, itérable version par version.</p>
     </div>
 
-    <div class="state hidden" id="loadingState">
-      <div class="spinner" role="status" aria-label="Génération en cours"></div>
-      <p>Génération en cours via le portail IAG…</p>
-      <span class="timer" id="timer">0 s</span>
-    </div>
-
-    <div class="state hidden" id="errorState">
-      <div class="error-box" id="errorMsg"></div>
-      <button class="btn-ghost" id="retryBtn">Réessayer</button>
-    </div>
-
     <iframe id="frame" class="hidden" title="Prévisualisation de l'interface générée"></iframe>
   </section>
 </main>
@@ -330,25 +332,14 @@
   let currentSessionId = null;
   let versions = [];          // cache d'affichage de la session chargée — le serveur fait foi
   let activeIndex = -1;
-  let lastPrompt = "";
-  let timerInterval = null;
   let currentBlobUrl = null;
 
   function setState(name) {
-    ["idleState", "loadingState", "errorState"].forEach((s) => $(s).classList.add("hidden"));
+    ["idleState"].forEach((s) => $(s).classList.add("hidden"));
     $("frame").classList.add("hidden");
     if (name === "frame") $("frame").classList.remove("hidden");
     else $(name).classList.remove("hidden");
   }
-
-  function startTimer() {
-    const start = Date.now();
-    $("timer").textContent = "0 s";
-    timerInterval = setInterval(() => {
-      $("timer").textContent = Math.round((Date.now() - start) / 1000) + " s";
-    }, 1000);
-  }
-  function stopTimer() { clearInterval(timerInterval); }
 
   function fmtDate(iso) {
     return new Date(iso).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -395,6 +386,7 @@
   }
 
   async function openSession(id) {
+    pending = null;
     try {
       const res = await fetch(`/api/sessions/${id}`);
       if (!res.ok) {
@@ -411,12 +403,18 @@
       if (versions.length) selectVersion(versions.length - 1);
       else { activeIndex = -1; renderThread(); setState("idleState"); }
     } catch (err) {
-      $("errorMsg").textContent = `Impossible de charger la session : ${err.message}`;
-      setState("errorState");
+      pending = {
+        prompt: "", gid: null,
+        startedAt: Date.now(), phase: null, chars: 0,
+        error: `Impossible de charger la session : ${err.message}`,
+        retry: () => openSession(id),
+      };
+      renderThread();
     }
   }
 
   function newDesign() {
+    pending = null;
     currentSessionId = null;
     versions = [];
     activeIndex = -1;
@@ -463,13 +461,54 @@
       card.addEventListener("click", () => selectVersion(i));
       thread.appendChild(card);
     });
-    renderPending(thread); // no-op tant que pending === null (implémenté en Task 3)
+    renderPending(thread); // no-op tant que pending === null
     thread.scrollTop = thread.scrollHeight;
   }
 
+  const PHASE_LABELS = {
+    attente: "Envoi au portail IAG…",
+    génération: "Génération en cours…",
+    extraction: "Extraction du HTML…",
+    enregistré: "Version enregistrée",
+  };
+
   function renderPending(thread) {
-    // Task 3 : bulle du prompt en vol + carte d'activité / carte d'erreur.
-    void thread;
+    if (!pending) return;
+    if (pending.prompt) {
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = pending.prompt;
+      thread.appendChild(bubble);
+    }
+
+    if (pending.error) {
+      const card = document.createElement("div");
+      card.className = "card-error";
+      card.setAttribute("role", "alert");
+      const msg = document.createElement("div");
+      msg.textContent = pending.error;
+      const retry = document.createElement("button");
+      retry.className = "btn-ghost";
+      retry.textContent = "Réessayer";
+      retry.addEventListener("click", () => {
+        const r = pending.retry;
+        pending = null;
+        r();
+      });
+      card.append(msg, retry);
+      thread.appendChild(card);
+      return;
+    }
+
+    const card = document.createElement("div");
+    card.className = "activity";
+    card.setAttribute("role", "status");
+    const secs = Math.round((Date.now() - pending.startedAt) / 1000);
+    const meta = pending.chars > 0 ? `${pending.chars.toLocaleString("fr-FR")} car. · ${secs} s` : `${secs} s`;
+    card.innerHTML = '<div class="spinner" aria-hidden="true"></div><span class="a-label"></span><span class="a-meta"></span>';
+    card.querySelector(".a-label").textContent = PHASE_LABELS[pending.phase] || PHASE_LABELS.attente;
+    card.querySelector(".a-meta").textContent = meta;
+    thread.appendChild(card);
   }
 
   function selectVersion(i) {
@@ -489,15 +528,34 @@
 
   async function generate() {
     const prompt = $("prompt").value.trim();
-    if (!prompt) return;
-    lastPrompt = prompt;
-    // Instantané de la session visée par CETTE requête : si l'utilisateur
-    // ouvre une autre session pendant que la génération est en vol, la
-    // réponse ne doit pas polluer l'affichage de la session désormais active.
+    if (!prompt || pending) return;
     const requestSessionId = currentSessionId;
+    const gid = crypto.randomUUID();
+    pending = {
+      prompt, gid,
+      startedAt: Date.now(), phase: "attente", chars: 0, error: null,
+      retry: () => { $("prompt").value = prompt; generate(); },
+    };
     $("generateBtn").disabled = true;
-    setState("loadingState");
-    startTimer();
+    $("prompt").disabled = true;
+    $("prompt").value = "";
+    $("prompt").style.height = "auto";
+    renderThread();
+
+    // Polling : rafraîchit la carte d'activité tant que CETTE génération est
+    // affichée. Un échec de poll ne coupe jamais la génération elle-même.
+    const poll = setInterval(async () => {
+      if (!pending || pending.gid !== gid || currentSessionId !== requestSessionId) return;
+      try {
+        const r = await fetch(`/api/progress/${gid}`);
+        if (r.ok) {
+          const j = await r.json();
+          pending.phase = j.phase;
+          pending.chars = j.chars;
+        }
+      } catch { /* réseau : on garde le temps écoulé local */ }
+      if (pending && pending.gid === gid && currentSessionId === requestSessionId && !pending.error) renderThread();
+    }, 500);
 
     try {
       const res = await fetch("/api/generate", {
@@ -507,24 +565,26 @@
           prompt,
           sessionId: currentSessionId,
           versionIndex: activeIndex >= 0 ? activeIndex : undefined,
+          generationId: gid,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur inconnue");
 
       if (currentSessionId !== requestSessionId) {
-        // L'utilisateur a navigué vers une autre session pendant la génération.
-        // Le serveur a bien persisté la version ; on rafraîchit juste les
-        // métadonnées (compteur de versions) sans toucher à l'affichage courant.
+        // L'utilisateur a changé de session pendant la génération : le serveur
+        // a persisté la version, on rafraîchit les métadonnées sans toucher au fil.
+        pending = null;
         await loadSessionList();
-        renderSessions();
         return;
       }
 
+      pending = null;
       const isNew = !currentSessionId;
       currentSessionId = data.sessionId;
       versions.push(data.version);
       if (isNew) {
+        $("threadTitle").textContent = data.title;
         sessions.unshift({
           id: data.sessionId,
           title: data.title,
@@ -532,21 +592,25 @@
           updatedAt: data.version.createdAt,
           versionCount: versions.length,
         });
-        $("threadTitle").textContent = data.title;
       } else {
         const meta = sessions.find((s) => s.id === currentSessionId);
         if (meta) { meta.updatedAt = data.version.createdAt; meta.versionCount = versions.length; }
         sessions.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
       }
-      $("prompt").value = "";
       selectVersion(versions.length - 1);
       renderSessions();
     } catch (err) {
-      $("errorMsg").textContent = err.message;
-      setState("errorState");
+      if (currentSessionId === requestSessionId && pending && pending.gid === gid) {
+        pending.error = err.message;
+        renderThread();
+      } else {
+        pending = null;
+      }
     } finally {
-      stopTimer();
+      clearInterval(poll);
       $("generateBtn").disabled = false;
+      $("prompt").disabled = false;
+      if (currentSessionId === requestSessionId) $("prompt").focus();
     }
   }
 
@@ -555,10 +619,6 @@
   $("generateBtn").addEventListener("click", generate);
   $("prompt").addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") generate();
-  });
-  $("retryBtn").addEventListener("click", () => {
-    $("prompt").value = lastPrompt;
-    generate();
   });
   $("prompt").addEventListener("input", () => {
     const t = $("prompt");
