@@ -4,23 +4,30 @@ Alternative interne aux outils de design IA. Génère des interfaces web (HTML a
 
 **Architecture "stream tolérant"** : le serveur streame avec le portail (obligatoire — le nginx de la gateway coupe en 504 les connexions silencieuses du mode non-stream), mais parse le SSE de façon tolérante : ids de chunks ignorés, rafales bufferisées acceptées, bruit filtré. Le navigateur, lui, reçoit un simple JSON complet. C'est exactement ce que le SDK strict d'OpenDesign refusait de faire.
 
-## Démarrage (3 étapes)
+## Installation (une seule fois)
+
+Prérequis : [Node.js LTS](https://nodejs.org/fr) installé (version 18 ou plus), et le VPN EDF actif.
+
+Copie-colle ce bloc dans le Terminal, en remplaçant les **3 valeurs** du fichier `.env`
+(demande l'URL du portail et le nom du modèle à l'équipe) :
 
 ```bash
-# 1. Installer (une seule fois)
+git clone https://github.com/SirnaEls/edf-design-app.git
+cd edf-design-app
 npm install
-
-# 2. Configurer : crée un fichier .env à la racine avec
-#    IAG_BASE_URL=…/v1   (URL de base du portail IAG, /v1 inclus)
-#    IAG_API_KEY=…       (ta clé API fournie par EDF)
-#    IAG_MODEL=…         (nom exact du modèle côté portail)
-#    PORT et TIMEOUT_MS optionnels (défauts : 3000 / 600000)
-
-# 3. Lancer
+cat > .env <<'FIN'
+IAG_BASE_URL=https://url-du-portail/v1
+IAG_API_KEY=ta-clé-ici
+IAG_MODEL=nom-du-modèle
+FIN
 npm start
 ```
 
-Puis ouvre **http://localhost:3000**.
+Puis ouvre **http://localhost:3000**. Les fois suivantes : `cd edf-design-app && npm start`.
+
+Pour mettre à jour l'outil : `git pull` dans le dossier, c'est tout.
+Ta clé reste dans ton `.env`, sur ta machine, jamais commitée ni exposée au réseau
+(le serveur n'écoute qu'en local).
 
 ## Utilisation
 

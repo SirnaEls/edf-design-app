@@ -17,7 +17,24 @@ const MODEL = process.env.IAG_MODEL; // nom exact du modèle côté portail
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MS || 600000); // 10 min
 
 if (!PORTAL_URL || !API_KEY || !MODEL) {
-  console.error("Config manquante : renseigne IAG_BASE_URL, IAG_API_KEY et IAG_MODEL dans .env");
+  const manquantes = [
+    !PORTAL_URL && "IAG_BASE_URL",
+    !API_KEY && "IAG_API_KEY",
+    !MODEL && "IAG_MODEL",
+  ].filter(Boolean);
+  console.error(`
+⚠️  Configuration incomplète — variable(s) manquante(s) : ${manquantes.join(", ")}
+
+Crée un fichier nommé .env à la racine du projet (même dossier que server.js)
+avec ces trois lignes, puis relance « npm start » :
+
+  IAG_BASE_URL=…/v1        ← URL de base du portail IAG, /v1 inclus
+  IAG_API_KEY=ta-clé-ici   ← ta clé API personnelle fournie par EDF
+  IAG_MODEL=…              ← nom exact du modèle côté portail
+
+Demande l'URL du portail et le nom du modèle à l'équipe si tu ne les as pas.
+Rappel : le portail n'est joignable que depuis le réseau EDF (VPN activé).
+`);
   process.exit(1);
 }
 
@@ -235,8 +252,20 @@ module.exports = { app };
 // Démarrage direct uniquement (les tests importent { app } sans écouter)
 if (require.main === module) {
   const PORT = Number(process.env.PORT || 3000);
-  app.listen(PORT, () => {
+  // 127.0.0.1 : l'outil (et la clé derrière) n'est joignable que depuis cette machine
+  const server = app.listen(PORT, "127.0.0.1", () => {
     console.log(`EDF Design prêt → http://localhost:${PORT}`);
     console.log(`Portail : ${PORTAL_URL} · Modèle : ${MODEL} · Mode : stream tolérant (anti-504)`);
+  });
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`
+⚠️  Le port ${PORT} est déjà utilisé — l'outil tourne probablement déjà.
+Vérifie http://localhost:${PORT} dans ton navigateur, ou lance sur un autre
+port : PORT=3001 npm start
+`);
+      process.exit(1);
+    }
+    throw err;
   });
 }
