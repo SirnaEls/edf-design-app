@@ -441,6 +441,9 @@
 
   function renderThread() {
     const thread = $("thread");
+    // Ne force le scroll bas que si l'utilisateur y était déjà : pendant le
+    // polling (re-render toutes les 500 ms), remonter lire le fil doit rester possible.
+    const enBas = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80;
     thread.innerHTML = "";
     if (!versions.length && !pending) {
       thread.innerHTML = '<p class="empty">Décris une interface ci-dessous et lance la génération.<br />Chaque échange devient une version, cliquable pour y revenir.</p>';
@@ -462,7 +465,7 @@
       thread.appendChild(card);
     });
     renderPending(thread); // no-op tant que pending === null
-    thread.scrollTop = thread.scrollHeight;
+    if (enBas) thread.scrollTop = thread.scrollHeight;
   }
 
   const PHASE_LABELS = {
@@ -530,6 +533,7 @@
     const prompt = $("prompt").value.trim();
     if (!prompt || pending) return;
     const requestSessionId = currentSessionId;
+    let aNavigue = false;
     const gid = crypto.randomUUID();
     pending = {
       prompt, gid,
@@ -574,6 +578,7 @@
       if (currentSessionId !== requestSessionId) {
         // L'utilisateur a changé de session pendant la génération : le serveur
         // a persisté la version, on rafraîchit les métadonnées sans toucher au fil.
+        aNavigue = true;
         pending = null;
         await loadSessionList();
         return;
@@ -604,13 +609,14 @@
         pending.error = err.message;
         renderThread();
       } else {
+        aNavigue = true;
         pending = null;
       }
     } finally {
       clearInterval(poll);
       $("generateBtn").disabled = false;
       $("prompt").disabled = false;
-      if (currentSessionId === requestSessionId) $("prompt").focus();
+      if (!aNavigue) $("prompt").focus();
     }
   }
 
