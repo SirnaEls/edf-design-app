@@ -45,14 +45,23 @@ async function saveSession(session) {
 
 async function loadSession(id) {
   if (!isValidId(id)) return null;
+  let parsed;
   try {
-    return JSON.parse(await fs.readFile(fileFor(id), "utf8"));
+    parsed = JSON.parse(await fs.readFile(fileFor(id), "utf8"));
   } catch (err) {
     if (err.code !== "ENOENT") {
       console.error(`[store] session ${id} illisible :`, err.message);
     }
     return null;
   }
+  // JSON valide mais schéma inattendu (pas de tableau versions, etc.) :
+  // on l'ignore comme un fichier corrompu plutôt que de propager une forme
+  // invalide qui ferait planter listSessions() ou /api/generate en aval.
+  if (!parsed || !Array.isArray(parsed.versions)) {
+    console.error(`[store] session ${id} au schéma invalide (versions manquant) : ignorée`);
+    return null;
+  }
+  return parsed;
 }
 
 async function listSessions() {

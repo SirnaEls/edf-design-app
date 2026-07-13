@@ -198,11 +198,18 @@ app.post("/api/generate", async (req, res) => {
   }
 });
 
-app.get("/api/sessions", async (_req, res) => {
-  res.json(await store.listSessions());
+// Express 4 ne rattrape pas les rejets des handlers async : sans ce garde-fou,
+// toute erreur non prévue tuerait le processus.
+const wrap = (fn) => (req, res) => fn(req, res).catch((err) => {
+  console.error("[erreur route]", err);
+  res.status(500).json({ error: "Erreur interne du serveur." });
 });
 
-app.get("/api/sessions/:id", async (req, res) => {
+app.get("/api/sessions", wrap(async (_req, res) => {
+  res.json(await store.listSessions());
+}));
+
+app.get("/api/sessions/:id", wrap(async (req, res) => {
   if (!store.isValidId(req.params.id)) {
     return res.status(400).json({ error: "Identifiant de session invalide." });
   }
@@ -211,9 +218,9 @@ app.get("/api/sessions/:id", async (req, res) => {
     return res.status(404).json({ error: "Session introuvable. Elle a peut-être été supprimée." });
   }
   res.json(session);
-});
+}));
 
-app.delete("/api/sessions/:id", async (req, res) => {
+app.delete("/api/sessions/:id", wrap(async (req, res) => {
   if (!store.isValidId(req.params.id)) {
     return res.status(400).json({ error: "Identifiant de session invalide." });
   }
@@ -221,7 +228,7 @@ app.delete("/api/sessions/:id", async (req, res) => {
     return res.status(404).json({ error: "Session introuvable. Elle a peut-être été supprimée." });
   }
   res.json({ ok: true });
-});
+}));
 
 module.exports = { app };
 

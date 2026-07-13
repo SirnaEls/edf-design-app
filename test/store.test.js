@@ -60,6 +60,17 @@ test("listSessions : tri updatedAt décroissant, fichier corrompu ignoré", asyn
   assert.deepEqual(Object.keys(meta).sort(), ["createdAt", "id", "title", "updatedAt", "versionCount"]);
 });
 
+test("loadSession : schéma invalide (pas de versions) ignoré comme corrompu", async () => {
+  const s = store.newSession("session au schéma invalide");
+  delete s.versions;
+  await fs.writeFile(path.join(store.DATA_DIR, `${s.id}.json`), JSON.stringify(s), "utf8");
+
+  assert.equal(await store.loadSession(s.id), null);
+
+  const list = await store.listSessions();
+  assert.ok(!list.some((x) => x.id === s.id), "listSessions ignore le fichier au schéma invalide sans planter");
+});
+
 test("deleteSession : true puis la session disparaît ; false si inconnue", async () => {
   const s = store.newSession("à supprimer");
   await store.saveSession(s);

@@ -3,6 +3,10 @@
  * (ids de chunks changeants, rafales bufferisées, lignes de bruit SSE,
  * chunk usage-only). Utilisé par test/api.test.js et rejouable à la main :
  *   node test/mock-gateway.js   → http://localhost:9999/v1
+ *
+ * Ce fichier ne doit PAS être listé dans le script "test" de package.json :
+ * son bloc require.main === module démarre un serveur sur :9999 et bloquerait
+ * un `node --test` lancé sans liste explicite de fichiers.
  */
 const http = require("http");
 const crypto = require("crypto");
