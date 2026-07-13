@@ -124,26 +124,29 @@ test("generationId déjà en cours : la 2e génération n'écrase pas le suivi d
   const gid = `test-doublon-${Date.now()}`;
   const p1 = post("/api/generate", { prompt: "Page A", generationId: gid });
 
-  // Attend que la 1re génération soit enregistrée dans le suivi
-  let avant = null;
-  for (let i = 0; i < 200 && !avant; i++) {
+  // Attend que la 1re génération soit suivie, puis laisse le temps s'accumuler
+  let vivant = false;
+  for (let i = 0; i < 200 && !vivant; i++) {
     await new Promise((r) => setTimeout(r, 5));
-    const pr = await fetch(`${base}/api/progress/${gid}`);
-    if (pr.ok) avant = await pr.json();
+    vivant = (await fetch(`${base}/api/progress/${gid}`)).ok;
   }
-  assert.ok(avant, "le suivi de la 1re génération doit être enregistré");
+  assert.ok(vivant, "le suivi de la 1re génération doit être enregistré");
+  await new Promise((r) => setTimeout(r, 60));
 
-  // 2e génération avec le MÊME id pendant que la 1re est en vol
+  // Mesure fraîche JUSTE avant la 2e requête : elapsedMs vaut maintenant ≥ 60 ms
+  const prAvant = await fetch(`${base}/api/progress/${gid}`);
+
   const p2 = post("/api/generate", { prompt: "Page B", generationId: gid });
-  await new Promise((r) => setTimeout(r, 30));
+  await new Promise((r) => setTimeout(r, 25)); // < aux ~60 ms accumulés : un reset ferait reculer elapsedMs
 
-  // Si le garde-fou régressait, la 2e réinitialiserait l'entrée (elapsedMs ~0).
-  // L'entrée peut aussi avoir déjà été nettoyée (1re finie) : un 404 est acceptable,
-  // seul un elapsedMs qui recule est une régression.
-  const pr = await fetch(`${base}/api/progress/${gid}`);
-  if (pr.ok) {
-    const apres = await pr.json();
-    assert.ok(apres.elapsedMs >= avant.elapsedMs, "le suivi de la 1re ne doit pas être réinitialisé par la 2e");
+  const prApres = await fetch(`${base}/api/progress/${gid}`);
+  if (prAvant.ok && prApres.ok) {
+    const avant = await prAvant.json();
+    const apres = await prApres.json();
+    assert.ok(
+      apres.elapsedMs >= avant.elapsedMs,
+      `le suivi de la 1re a été réinitialisé (${apres.elapsedMs} ms < ${avant.elapsedMs} ms)`
+    );
   }
 
   const [r1, r2] = await Promise.all([p1, p2]);
