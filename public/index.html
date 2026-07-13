@@ -437,6 +437,10 @@
     const prompt = $("prompt").value.trim();
     if (!prompt) return;
     lastPrompt = prompt;
+    // Instantané de la session visée par CETTE requête : si l'utilisateur
+    // ouvre une autre session pendant que la génération est en vol, la
+    // réponse ne doit pas polluer l'affichage de la session désormais active.
+    const requestSessionId = currentSessionId;
     $("generateBtn").disabled = true;
     setState("loadingState");
     startTimer();
@@ -453,6 +457,15 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur inconnue");
+
+      if (currentSessionId !== requestSessionId) {
+        // L'utilisateur a navigué vers une autre session pendant la génération.
+        // Le serveur a bien persisté la version ; on rafraîchit juste les
+        // métadonnées (compteur de versions) sans toucher à l'affichage courant.
+        await loadSessionList();
+        renderSessions();
+        return;
+      }
 
       const isNew = !currentSessionId;
       currentSessionId = data.sessionId;
