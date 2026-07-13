@@ -140,8 +140,11 @@ app.post("/api/generate", async (req, res) => {
     session = store.newSession(prompt); // rien n'est écrit tant que la génération n'a pas réussi
   }
 
-  // Suivi de progression : optionnel, jamais bloquant (id invalide → ignoré)
-  const trackId = isValidGenerationId(generationId) ? generationId : null;
+  // Suivi de progression : optionnel, jamais bloquant (id invalide OU déjà
+  // en cours → ignoré : un id ne suit qu'une génération à la fois)
+  const trackId = isValidGenerationId(generationId) && !progressMap.has(generationId)
+    ? generationId
+    : null;
   if (trackId) progressMap.set(trackId, { phase: "attente", chars: 0, startedAt: Date.now() });
 
   // Version active : l'index demandé s'il est valide, sinon la dernière
