@@ -63,28 +63,61 @@
   }
   @media (max-width: 800px) { main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } }
 
-  /* ---- Panneau gauche ---- */
+  /* ---- Panneau gauche : fil de conversation ---- */
   aside {
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     min-height: 0;
   }
-  .prompt-zone { padding: 16px; border-bottom: 1px solid var(--border); }
-  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
-  textarea {
-    width: 100%;
-    min-height: 110px;
-    resize: vertical;
+  .thread-head {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .thread-head h2 {
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .thread {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bubble {
+    align-self: flex-end;
+    max-width: 88%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    border-bottom-right-radius: 4px;
+    padding: 10px 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+  .card {
+    align-self: stretch;
+    text-align: left;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    padding: 10px 12px;
     color: var(--text);
-    padding: 12px;
-    font: inherit;
-    line-height: 1.5;
+    font-weight: 400;
+    transition: border-color 150ms, background 150ms;
   }
-  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .card:hover { border-color: var(--text-dim); }
+  .card.active { border-color: var(--accent); background: var(--panel-2); }
+  .card .v-num { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .card .v-meta { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-left: 8px; }
+  .empty { color: var(--text-dim); font-size: 13px; line-height: 1.6; margin: auto; text-align: center; padding: 24px; }
 
   button {
     font: inherit;
@@ -107,64 +140,67 @@
     font-size: 13px;
   }
   .btn-ghost:hover { color: var(--text); border-color: var(--text-dim); }
-
-  .hint { font-size: 12px; color: var(--text-dim); margin-top: 10px; line-height: 1.5; }
-
-  /* ---- Sessions & Versions ---- */
-  .sessions {
-    padding: 16px;
-    border-bottom: 1px solid var(--border);
-    max-height: 38%;
-    overflow-y: auto;
-    flex-shrink: 0;
-  }
-  .versions { flex: 1; overflow-y: auto; padding: 16px; }
-  .sessions h2, .versions h2 { font-size: 12px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
-  .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .panel-head h2 { margin-bottom: 0; }
   .btn-small { padding: 4px 10px; font-size: 12px; }
-  .session-row { position: relative; }
-  .session-row .version-item { padding-right: 36px; }
-  .s-title { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .s-meta { display: block; font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 3px; }
-  .session-delete {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--text-dim);
-    padding: 2px 8px;
-    font-size: 14px;
-    line-height: 1;
-    border-radius: 6px;
+
+  /* ---- Composer ---- */
+  .composer {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
   }
-  .session-delete:hover, .session-delete:focus-visible { color: var(--danger); border-color: var(--danger); }
-  .version-item {
-    width: 100%;
-    text-align: left;
+  .composer textarea {
+    flex: 1;
+    min-height: 40px;
+    max-height: 132px;
+    resize: none;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 10px 12px;
-    margin-bottom: 8px;
     color: var(--text);
-    font-weight: 400;
-    display: block;
+    padding: 10px 12px;
+    font: inherit;
+    line-height: 1.5;
   }
-  .version-item:hover { border-color: var(--text-dim); }
-  .version-item.active { border-color: var(--accent); background: var(--panel-2); }
-  .version-item .v-num { font-family: var(--mono); font-size: 11px; color: var(--accent); }
-  .version-item .v-prompt {
-    display: block;
-    font-size: 12.5px;
-    color: var(--text-dim);
-    margin-top: 3px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .composer textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .composer .btn-primary { width: auto; margin: 0; padding: 10px 14px; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
-  .empty { color: var(--text-dim); font-size: 13px; line-height: 1.6; }
+
+  /* ---- Tiroir sessions ---- */
+  .drawer-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9;
+  }
+  .drawer {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: 320px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .drawer-head h2 { font-size: 12px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .drawer.hidden, .drawer-backdrop.hidden { display: none; }
+  .session-row { position: relative; }
+  .session-row .card { width: 100%; padding-right: 36px; margin-bottom: 8px; display: block; }
+  .s-title { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .s-meta { display: block; font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .session-delete {
+    position: absolute; top: 8px; right: 8px;
+    background: transparent; border: 1px solid transparent;
+    color: var(--text-dim); padding: 2px 8px; font-size: 14px; line-height: 1; border-radius: 6px;
+  }
+  .session-delete:hover, .session-delete:focus-visible { color: var(--danger); border-color: var(--danger); }
 
   /* ---- Préview ---- */
   .preview {
@@ -230,33 +266,34 @@
   <div class="logo">EDF <span>Design</span></div>
   <div class="badge" id="modelBadge">portail IAG · stream tolérant</div>
   <div class="header-actions">
+    <button class="btn-ghost" id="sessionsBtn" aria-haspopup="dialog">Sessions</button>
+    <button class="btn-ghost" id="newSessionBtn">Nouveau design</button>
     <button class="btn-ghost" id="copyBtn" disabled>Copier le code</button>
     <button class="btn-ghost" id="downloadBtn" disabled>Télécharger .html</button>
   </div>
 </header>
 
+<div class="drawer-backdrop hidden" id="drawerBackdrop"></div>
+<div class="drawer hidden" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+  <div class="drawer-head">
+    <h2 id="drawerTitle">Sessions</h2>
+    <button class="btn-ghost btn-small" id="drawerCloseBtn" aria-label="Fermer les sessions">✕</button>
+  </div>
+  <div id="sessionList" role="list" aria-labelledby="drawerTitle">
+    <p class="empty">Aucune session enregistrée.</p>
+  </div>
+</div>
+
 <main>
   <aside>
-    <div class="prompt-zone">
-      <label for="prompt">Décris l'interface ou la modification</label>
-      <textarea id="prompt" placeholder="Ex : Dashboard de suivi des API avec liste des environnements, statuts de santé et graphique d'appels sur 7 jours"></textarea>
+    <div class="thread-head">
+      <h2 id="threadTitle">Nouveau design</h2>
+    </div>
+    <div class="thread" id="thread"></div>
+    <div class="composer">
+      <label for="prompt" class="sr-only">Décris l'interface ou la modification</label>
+      <textarea id="prompt" rows="1" placeholder="Décris l'interface ou la modification…"></textarea>
       <button class="btn-primary" id="generateBtn">Générer</button>
-      <p class="hint">Chaque génération prend 20 à 60 s ; le résultat s'affiche d'un bloc à la fin. Sélectionne une version puis décris un changement pour itérer dessus.</p>
-    </div>
-    <div class="sessions">
-      <div class="panel-head">
-        <h2 id="sessionsTitle">Sessions</h2>
-        <button class="btn-ghost btn-small" id="newSessionBtn">Nouveau design</button>
-      </div>
-      <div id="sessionList" role="list" aria-labelledby="sessionsTitle">
-        <p class="empty">Aucune session enregistrée.</p>
-      </div>
-    </div>
-    <div class="versions">
-      <h2 id="versionsTitle">Versions</h2>
-      <div id="versionList" role="list" aria-labelledby="versionsTitle">
-        <p class="empty">Aucune version pour l'instant. La première génération apparaîtra ici.</p>
-      </div>
     </div>
   </aside>
 
@@ -332,11 +369,11 @@
       row.setAttribute("role", "listitem");
 
       const open = document.createElement("button");
-      open.className = "version-item" + (s.id === currentSessionId ? " active" : "");
+      open.className = "card" + (s.id === currentSessionId ? " active" : "");
       open.innerHTML = '<span class="s-title"></span><span class="s-meta"></span>';
       open.querySelector(".s-title").textContent = s.title;
       open.querySelector(".s-meta").textContent = `${s.versionCount} version${s.versionCount > 1 ? "s" : ""} · ${fmtDate(s.updatedAt)}`;
-      open.addEventListener("click", () => openSession(s.id));
+      open.addEventListener("click", () => { openSession(s.id); closeDrawer(); });
 
       const del = document.createElement("button");
       del.className = "session-delete";
@@ -369,9 +406,10 @@
       const s = await res.json();
       currentSessionId = s.id;
       versions = s.versions;
+      $("threadTitle").textContent = s.title;
       renderSessions();
       if (versions.length) selectVersion(versions.length - 1);
-      else { activeIndex = -1; renderVersions(); setState("idleState"); }
+      else { activeIndex = -1; renderThread(); setState("idleState"); }
     } catch (err) {
       $("errorMsg").textContent = `Impossible de charger la session : ${err.message}`;
       setState("errorState");
@@ -382,7 +420,8 @@
     currentSessionId = null;
     versions = [];
     activeIndex = -1;
-    renderVersions();
+    $("threadTitle").textContent = "Nouveau design";
+    renderThread();
     renderSessions();
     setState("idleState");
     ["copyBtn", "downloadBtn", "openTabBtn"].forEach((id) => ($(id).disabled = true));
@@ -397,25 +436,40 @@
     if (currentSessionId === id) newDesign(); else renderSessions();
   }
 
-  /* ---- Versions ---- */
+  /* ---- Fil de conversation ---- */
 
-  function renderVersions() {
-    const list = $("versionList");
-    list.innerHTML = "";
-    if (!versions.length) {
-      list.innerHTML = '<p class="empty">Aucune version pour l\'instant. La première génération apparaîtra ici.</p>';
+  // pending : état de la génération en cours affiché dans le fil (Task 3). null = aucune.
+  let pending = null;
+
+  function renderThread() {
+    const thread = $("thread");
+    thread.innerHTML = "";
+    if (!versions.length && !pending) {
+      thread.innerHTML = '<p class="empty">Décris une interface ci-dessous et lance la génération.<br />Chaque échange devient une version, cliquable pour y revenir.</p>';
       return;
     }
     versions.forEach((v, i) => {
-      const btn = document.createElement("button");
-      btn.className = "version-item" + (i === activeIndex ? " active" : "");
-      btn.setAttribute("role", "listitem");
-      btn.innerHTML = '<span class="v-num"></span><span class="v-prompt"></span>';
-      btn.querySelector(".v-num").textContent = `v${i + 1}`;
-      btn.querySelector(".v-prompt").textContent = v.prompt;
-      btn.addEventListener("click", () => selectVersion(i));
-      list.appendChild(btn);
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = v.prompt;
+      thread.appendChild(bubble);
+
+      const card = document.createElement("button");
+      card.className = "card" + (i === activeIndex ? " active" : "");
+      card.innerHTML = '<span class="v-num"></span><span class="v-meta"></span>';
+      card.querySelector(".v-num").textContent = `v${i + 1}`;
+      card.querySelector(".v-meta").textContent = fmtDate(v.createdAt);
+      card.setAttribute("aria-label", `Afficher la version ${i + 1}`);
+      card.addEventListener("click", () => selectVersion(i));
+      thread.appendChild(card);
     });
+    renderPending(thread); // no-op tant que pending === null (implémenté en Task 3)
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function renderPending(thread) {
+    // Task 3 : bulle du prompt en vol + carte d'activité / carte d'erreur.
+    void thread;
   }
 
   function selectVersion(i) {
@@ -428,7 +482,7 @@
     $("previewTitle").textContent = `v${i + 1} — ${versions[i].prompt.slice(0, 60)}`;
     ["copyBtn", "downloadBtn", "openTabBtn"].forEach((id) => ($(id).disabled = false));
     setState("frame");
-    renderVersions();
+    renderThread();
   }
 
   /* ---- Génération ---- */
@@ -478,6 +532,7 @@
           updatedAt: data.version.createdAt,
           versionCount: versions.length,
         });
+        $("threadTitle").textContent = data.title;
       } else {
         const meta = sessions.find((s) => s.id === currentSessionId);
         if (meta) { meta.updatedAt = data.version.createdAt; meta.versionCount = versions.length; }
@@ -504,6 +559,43 @@
   $("retryBtn").addEventListener("click", () => {
     $("prompt").value = lastPrompt;
     generate();
+  });
+  $("prompt").addEventListener("input", () => {
+    const t = $("prompt");
+    t.style.height = "auto";
+    t.style.height = Math.min(t.scrollHeight, 132) + "px";
+  });
+
+  /* ---- Tiroir sessions ---- */
+
+  let drawerReturnFocus = null;
+
+  function openDrawer() {
+    drawerReturnFocus = document.activeElement;
+    $("drawer").classList.remove("hidden");
+    $("drawerBackdrop").classList.remove("hidden");
+    $("drawerCloseBtn").focus();
+  }
+
+  function closeDrawer() {
+    $("drawer").classList.add("hidden");
+    $("drawerBackdrop").classList.add("hidden");
+    if (drawerReturnFocus) drawerReturnFocus.focus();
+  }
+
+  $("sessionsBtn").addEventListener("click", openDrawer);
+  $("drawerCloseBtn").addEventListener("click", closeDrawer);
+  $("drawerBackdrop").addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("drawer").classList.contains("hidden")) closeDrawer();
+  });
+  // Piège à focus minimal : Tab reste dans le tiroir tant qu'il est ouvert
+  $("drawer").addEventListener("keydown", (e) => {
+    if (e.key !== "Tab") return;
+    const focusables = $("drawer").querySelectorAll("button");
+    const first = focusables[0], last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
   $("newSessionBtn").addEventListener("click", newDesign);
 
