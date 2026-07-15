@@ -7,15 +7,16 @@ Alternative interne aux outils de design IA pour le lab EDF. Génère des interf
 ```
 public/index.html  →  POST /api/generate  →  server.js  →  Portail IAG (stream:true, parseur tolérant)
      (front)         GET/DELETE /api/sessions*  (Express)      (SSE sale accepté)
+                     GET /api/progress/:id
                               │
                               ▼
                      store.js → data/sessions/*.json
                      (un fichier par session, écriture atomique tmp+rename)
 ```
 
-- **server.js** : proxy Express. La clé API ne quitte JAMAIS le serveur. Source de vérité des sessions : relit toujours le disque via `store.js`, le front n'envoie ni `currentHtml` ni `history`.
+- **server.js** : proxy Express. La clé API ne quitte JAMAIS le serveur. Source de vérité des sessions : relit toujours le disque via `store.js`, le front n'envoie ni `currentHtml` ni `history`. `GET /api/progress/:id` expose la progression d'une génération en cours (phase, nombre de caractères) depuis un état en mémoire volatile — jamais persisté sur disque, n'expose ni prompt ni HTML.
 - **store.js** : persistance des sessions en JSON sur disque (`data/sessions/<id>.json`). Un fichier par session (une session corrompue n'affecte pas les autres), écriture atomique (fichier `.tmp` puis `rename`) pour survivre à un arrêt du serveur en pleine écriture.
-- **public/index.html** : front vanilla (pas de framework) — prompt, préview iframe (Blob URL), liste des sessions (rechargement auto au démarrage), historique de versions, export.
+- **public/index.html** : front vanilla (pas de framework). Panneau gauche : fil de conversation (bulles prompt + cartes-versions cliquables + carte d'activité au compteur temps réel pendant la génération + carte d'erreur avec bouton Réessayer), composer en bas. Sessions dans un tiroir accessible (dialog, fermeture au clavier Échap, retour du focus à la fermeture). Préview iframe (Blob URL), export.
 - **.env** : `IAG_BASE_URL`, `IAG_API_KEY`, `IAG_MODEL`, `PORT`, `TIMEOUT_MS`, `DATA_DIR` (optionnel, surcharge l'emplacement de `data/sessions/`). Jamais commité.
 
 ## Contraintes gateway — NE PAS CASSER
@@ -46,7 +47,7 @@ C'est le levier qualité n°1 des générations. Il impose : fichier HTML unique
 
 ## Tests
 
-`npm test` (node:test) : couvre `store.js` (persistance, écriture atomique, ids) et un test d'intégration API contre un mock gateway sale intégré (`test/mock-gateway.js` : ids de chunks changeants, rafales bufferisées, bruit SSE, chunk usage-only). Vérifie que `POST /api/generate` et les routes `GET/DELETE /api/sessions*` respectent le contrat malgré ce stream non conforme.
+`npm test` (node:test) : 18 tests (7 `store.js` — persistance, écriture atomique, ids — et 11 d'intégration API contre un mock gateway sale intégré `test/mock-gateway.js` : ids de chunks changeants, rafales bufferisées, bruit SSE, chunk usage-only, y compris la progression live via `GET /api/progress/:id` et le rejet d'un `generationId` en doublon). Vérifie que `POST /api/generate` et les routes `GET/DELETE /api/sessions*` respectent le contrat malgré ce stream non conforme.
 
 Pour une vérification manuelle en conditions réelles (navigateur, redémarrage du serveur) :
 ```bash
