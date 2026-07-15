@@ -143,9 +143,8 @@
   .btn-small { padding: 4px 10px; font-size: 12px; }
 
   /* ---- Composer ---- */
+  .composer-zone { border-top: 1px solid var(--border); flex-shrink: 0; }
   .composer {
-    flex-shrink: 0;
-    border-top: 1px solid var(--border);
     padding: 12px 16px;
     display: flex;
     gap: 8px;
@@ -166,6 +165,49 @@
   }
   .composer textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
   .composer .btn-primary { width: auto; margin: 0; padding: 10px 14px; }
+  .composer .btn-attach { padding: 10px 12px; font-size: 15px; line-height: 1.5; }
+  .attachments {
+    display: flex;
+    gap: 8px;
+    padding: 10px 16px 0;
+  }
+  .attachments.hidden { display: none; }
+  .attach-item { position: relative; }
+  .attach-item img {
+    width: 56px; height: 56px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: block;
+  }
+  .attach-remove {
+    position: absolute; top: -6px; right: -6px;
+    width: 20px; height: 20px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 11px; line-height: 1;
+  }
+  .attach-remove:hover, .attach-remove:focus-visible { color: var(--danger); border-color: var(--danger); }
+  .composer-hint {
+    padding: 8px 16px 0;
+    font-size: 12px;
+    color: var(--danger);
+    line-height: 1.4;
+  }
+  .composer-hint:empty { display: none; }
+  .composer.drag-over textarea { outline: 2px dashed var(--accent); outline-offset: 1px; }
+  .bubble .bubble-images { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .bubble .bubble-images img {
+    width: 72px; height: 72px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    display: block;
+  }
   .sr-only {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -303,10 +345,16 @@
       <h2 id="threadTitle">Nouveau design</h2>
     </div>
     <div class="thread" id="thread"></div>
-    <div class="composer">
-      <label for="prompt" class="sr-only">Décris l'interface ou la modification</label>
-      <textarea id="prompt" rows="1" placeholder="Décris l'interface ou la modification…"></textarea>
-      <button class="btn-primary" id="generateBtn">Générer</button>
+    <div class="composer-zone">
+      <div class="attachments hidden" id="attachments"></div>
+      <p class="composer-hint" id="composerHint" role="status"></p>
+      <div class="composer">
+        <button class="btn-ghost btn-attach" id="attachBtn" aria-label="Joindre une image (wireframe, maquette)" title="Joindre une image">📎</button>
+        <input type="file" id="fileInput" class="sr-only" accept="image/png,image/jpeg,image/webp" multiple />
+        <label for="prompt" class="sr-only">Décris l'interface ou la modification</label>
+        <textarea id="prompt" rows="1" placeholder="Décris l'interface ou la modification…"></textarea>
+        <button class="btn-primary" id="generateBtn">Générer</button>
+      </div>
     </div>
   </aside>
 
@@ -450,10 +498,7 @@
       return;
     }
     versions.forEach((v, i) => {
-      const bubble = document.createElement("div");
-      bubble.className = "bubble";
-      bubble.textContent = v.prompt;
-      thread.appendChild(bubble);
+      thread.appendChild(creerBulle(v.prompt, v.images));
 
       const card = document.createElement("button");
       card.className = "card" + (i === activeIndex ? " active" : "");
@@ -475,14 +520,28 @@
     enregistré: "Version enregistrée",
   };
 
+  function creerBulle(texte, images) {
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = texte;
+    if (images && images.length) {
+      const zone = document.createElement("div");
+      zone.className = "bubble-images";
+      images.forEach((url, i) => {
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = `Image jointe ${i + 1}`;
+        img.addEventListener("click", () => ouvrirImage(url));
+        zone.appendChild(img);
+      });
+      bubble.appendChild(zone);
+    }
+    return bubble;
+  }
+
   function renderPending(thread) {
     if (!pending) return;
-    if (pending.prompt) {
-      const bubble = document.createElement("div");
-      bubble.className = "bubble";
-      bubble.textContent = pending.prompt;
-      thread.appendChild(bubble);
-    }
+    if (pending.prompt) thread.appendChild(creerBulle(pending.prompt, pending.images));
 
     if (pending.error) {
       const card = document.createElement("div");
@@ -538,6 +597,92 @@
     renderThread();
   }
 
+  /* ---- Pièces jointes (wireframes, maquettes) ---- */
+
+  const MAX_IMAGES = 3;
+  const MAX_COTE = 1568; // côté long envoyé au modèle : suffisant, borne les tokens
+  let imagesEnAttente = []; // data URLs JPEG compressées
+
+  function hint(msg) { $("composerHint").textContent = msg || ""; }
+
+  async function compresserImage(fichier) {
+    const bmp = await createImageBitmap(fichier);
+    const ratio = Math.min(1, MAX_COTE / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * ratio);
+    canvas.height = Math.round(bmp.height * ratio);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; // les PNG transparents deviennent des JPEG sur fond blanc
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close();
+    return canvas.toDataURL("image/jpeg", 0.85);
+  }
+
+  async function ajouterImages(fichiers) {
+    for (const f of fichiers) {
+      if (!/^image\/(png|jpeg|webp)$/.test(f.type)) { hint(`« ${f.name} » ignoré : seuls PNG, JPEG et WebP sont acceptés.`); continue; }
+      if (f.size > 10 * 1024 * 1024) { hint(`« ${f.name} » ignoré : fichier trop lourd (10 Mo max).`); continue; }
+      if (imagesEnAttente.length >= MAX_IMAGES) { hint(`3 images maximum par message.`); break; }
+      try {
+        imagesEnAttente.push(await compresserImage(f));
+        hint("");
+      } catch {
+        hint(`Impossible de lire « ${f.name} ».`);
+      }
+    }
+    renderAttachments();
+  }
+
+  function renderAttachments() {
+    const zone = $("attachments");
+    zone.innerHTML = "";
+    zone.classList.toggle("hidden", imagesEnAttente.length === 0);
+    imagesEnAttente.forEach((url, i) => {
+      const item = document.createElement("div");
+      item.className = "attach-item";
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = `Image jointe ${i + 1}`;
+      const del = document.createElement("button");
+      del.className = "attach-remove";
+      del.textContent = "✕";
+      del.setAttribute("aria-label", `Retirer l'image ${i + 1}`);
+      del.addEventListener("click", () => {
+        imagesEnAttente.splice(i, 1);
+        renderAttachments();
+      });
+      item.append(img, del);
+      zone.appendChild(item);
+    });
+  }
+
+  function ouvrirImage(dataUrl) {
+    // Chrome bloque les data URLs en navigation directe : on passe par une Blob URL
+    fetch(dataUrl).then((r) => r.blob()).then((b) => window.open(URL.createObjectURL(b), "_blank"));
+  }
+
+  $("attachBtn").addEventListener("click", () => $("fileInput").click());
+  $("fileInput").addEventListener("change", () => {
+    ajouterImages([...$("fileInput").files]);
+    $("fileInput").value = "";
+  });
+  $("prompt").addEventListener("paste", (e) => {
+    const imgs = [...(e.clipboardData?.items || [])].filter((it) => it.type.startsWith("image/"));
+    if (imgs.length) {
+      e.preventDefault();
+      ajouterImages(imgs.map((it) => it.getAsFile()).filter(Boolean));
+    }
+  });
+  const composerEl = document.querySelector(".composer");
+  composerEl.addEventListener("dragover", (e) => { e.preventDefault(); composerEl.classList.add("drag-over"); });
+  composerEl.addEventListener("dragleave", () => composerEl.classList.remove("drag-over"));
+  composerEl.addEventListener("drop", (e) => {
+    e.preventDefault();
+    composerEl.classList.remove("drag-over");
+    ajouterImages([...(e.dataTransfer?.files || [])].filter((f) => f.type.startsWith("image/")));
+  });
+
   /* ---- Génération ---- */
 
   async function generate() {
@@ -546,11 +691,16 @@
     const requestSessionId = currentSessionId;
     let aNavigue = false;
     const gid = crypto.randomUUID();
+    const imagesEnvoyees = imagesEnAttente;
     pending = {
       prompt, gid,
+      images: imagesEnvoyees,
       startedAt: Date.now(), phase: "attente", chars: 0, error: null,
       retry: () => { if (!$("prompt").value.trim()) $("prompt").value = prompt; generate(); },
     };
+    imagesEnAttente = [];
+    renderAttachments();
+    hint("");
     $("generateBtn").disabled = true;
     $("prompt").disabled = true;
     $("prompt").value = "";
@@ -581,6 +731,7 @@
           sessionId: currentSessionId,
           versionIndex: activeIndex >= 0 ? activeIndex : undefined,
           generationId: gid,
+          images: imagesEnvoyees.length ? imagesEnvoyees : undefined,
         }),
       });
       const data = await res.json();
@@ -618,6 +769,12 @@
     } catch (err) {
       if (currentSessionId === requestSessionId && pending && pending.gid === gid) {
         pending.error = err.message;
+        // Restitue les images au composer : Réessayer comme une reformulation
+        // repartent avec — sauf si l'utilisateur en a déjà rajouté entre-temps
+        if (!imagesEnAttente.length) {
+          imagesEnAttente = pending.images || [];
+          renderAttachments();
+        }
         renderThread();
       } else {
         aNavigue = true;
