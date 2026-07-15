@@ -47,6 +47,7 @@ Règles strictes :
 - Accessibilité RGAA : contrastes AA minimum, focus visible, labels sur tous les champs, navigation clavier fonctionnelle, attributs ARIA quand nécessaire.
 - Contenu réaliste en français (jamais de lorem ipsum).
 - Responsive par défaut.
+- Si des images sont fournies (wireframe, maquette, capture), elles sont la référence visuelle : reproduis fidèlement leur structure, leur hiérarchie et leur intention, en les traduisant en interface propre et accessible.
 - Si l'utilisateur fournit un code existant et demande une modification, renvoie le fichier COMPLET modifié, pas un diff.`;
 
 /**
@@ -121,9 +122,21 @@ setInterval(() => {
 }, 60 * 1000).unref();
 
 app.post("/api/generate", async (req, res) => {
-  const { prompt, sessionId, versionIndex, generationId } = req.body || {};
+  const { prompt, sessionId, versionIndex, generationId, images } = req.body || {};
   if (!prompt || typeof prompt !== "string") {
     return res.status(400).json({ error: "Prompt manquant." });
+  }
+
+  // Images jointes : optionnelles, bornées (le front compresse déjà, ceci est la ceinture)
+  const PREFIXE_IMAGE = /^data:image\/(png|jpeg|webp);base64,/;
+  if (images != null) {
+    const invalide =
+      !Array.isArray(images) ||
+      images.length > 3 ||
+      images.some((i) => typeof i !== "string" || !PREFIXE_IMAGE.test(i) || i.length > 2 * 1024 * 1024);
+    if (invalide) {
+      return res.status(400).json({ error: "Images invalides : 3 maximum, PNG/JPEG/WebP en data URL, 2 Mo chacune." });
+    }
   }
 
   // Le serveur est la source de vérité : on relit la session depuis le disque
@@ -161,13 +174,22 @@ app.post("/api/generate", async (req, res) => {
     // On ne renvoie que les instructions passées (pas les gros HTML) pour limiter le contexte
     messages.push({ role: "user", content: turn });
   }
-  if (currentHtml) {
+  const texteCourant = currentHtml
+    ? `Voici le code actuel de l'interface :\n\n${currentHtml}\n\nModification demandée : ${prompt}`
+    : prompt;
+  if (images && images.length) {
+    // Format vision OpenAI (validé contre le portail IAG le 2026-07-15).
+    // Les images n'accompagnent QUE le message courant : l'historique rejoué
+    // reste du texte, on ne re-paye jamais leurs tokens aux tours suivants.
     messages.push({
       role: "user",
-      content: `Voici le code actuel de l'interface :\n\n${currentHtml}\n\nModification demandée : ${prompt}`,
+      content: [
+        { type: "text", text: texteCourant },
+        ...images.map((url) => ({ type: "image_url", image_url: { url } })),
+      ],
     });
   } else {
-    messages.push({ role: "user", content: prompt });
+    messages.push({ role: "user", content: texteCourant });
   }
 
   const controller = new AbortController();
@@ -222,7 +244,12 @@ app.post("/api/generate", async (req, res) => {
     }
 
     // Succès seulement : on ajoute la version et on persiste (écriture atomique)
-    const version = { prompt, html, createdAt: new Date().toISOString() };
+    const version = {
+      prompt,
+      html,
+      createdAt: new Date().toISOString(),
+      ...(images && images.length ? { images } : {}),
+    };
     session.versions.push(version);
     session.updatedAt = version.createdAt;
     await store.saveSession(session);

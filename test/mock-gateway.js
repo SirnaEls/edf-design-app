@@ -24,12 +24,18 @@ function sseChunk(content) {
 }
 
 function startMockGateway(port = 0) {
+  let dernierCorps = null;
   const server = http.createServer((req, res) => {
     if (req.method !== "POST" || !req.url.endsWith("/chat/completions")) {
       res.writeHead(404);
       return res.end();
     }
-    req.resume(); // consomme le corps sans le lire
+    // Capture le corps pour que les tests vérifient CE QUE le serveur envoie au portail
+    let corps = "";
+    req.on("data", (c) => (corps += c));
+    req.on("end", () => {
+      try { dernierCorps = JSON.parse(corps); } catch { dernierCorps = null; }
+    });
     res.writeHead(200, { "Content-Type": "text/event-stream" });
 
     const pieces = PAGE.match(/[\s\S]{1,40}/g);
@@ -62,7 +68,9 @@ function startMockGateway(port = 0) {
     res.on("error", () => {});
   });
   return new Promise((resolve) => {
-    server.listen(port, () => resolve({ server, port: server.address().port }));
+    server.listen(port, () =>
+      resolve({ server, port: server.address().port, dernierCorps: () => dernierCorps })
+    );
   });
 }
 

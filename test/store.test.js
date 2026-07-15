@@ -79,3 +79,16 @@ test("deleteSession : true puis la session disparaît ; false si inconnue", asyn
   assert.equal(await store.deleteSession(s.id), false);
   assert.equal(await store.deleteSession("../hack"), false);
 });
+
+test("une version avec images survit à save/load", async () => {
+  const s = store.newSession("Wireframe d'accueil");
+  s.versions.push({
+    prompt: "Wireframe d'accueil",
+    html: "<!DOCTYPE html><html></html>",
+    createdAt: new Date().toISOString(),
+    images: ["data:image/jpeg;base64,QUJD"],
+  });
+  await store.saveSession(s);
+  const relu = await store.loadSession(s.id);
+  assert.deepEqual(relu.versions[0].images, ["data:image/jpeg;base64,QUJD"]);
+});

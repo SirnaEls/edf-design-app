@@ -153,3 +153,39 @@ test("generationId déjà en cours : la 2e génération n'écrase pas le suivi d
   assert.equal(r1.status, 200);
   assert.equal(r2.status, 200);
 });
+
+test("images : transmises au portail en content tableau, persistées, jamais rejouées", async () => {
+  const img = "data:image/png;base64," + "A".repeat(100);
+  const res = await post("/api/generate", { prompt: "Page depuis wireframe", images: [img] });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.deepEqual(data.version.images, [img], "la version renvoyée porte les images");
+
+  const corps = mockServer.dernierCorps();
+  const dernier = corps.messages[corps.messages.length - 1];
+  assert.ok(Array.isArray(dernier.content), "message courant en tableau (format vision)");
+  assert.equal(dernier.content[0].type, "text");
+  assert.ok(
+    dernier.content.some((p) => p.type === "image_url" && p.image_url.url === img),
+    "l'image est jointe au message courant"
+  );
+
+  const full = await (await fetch(`${base}/api/sessions/${data.sessionId}`)).json();
+  assert.deepEqual(full.versions[0].images, [img], "persistée sur disque");
+
+  // Itération suivante SANS images : l'ancienne image ne repart pas au portail
+  const res2 = await post("/api/generate", { prompt: "Ajoute un titre", sessionId: data.sessionId });
+  assert.equal(res2.status, 200);
+  assert.ok(
+    !JSON.stringify(mockServer.dernierCorps().messages).includes("image_url"),
+    "les images des tours précédents ne sont jamais rejouées"
+  );
+  assert.equal((await res2.json()).version.images, undefined, "pas de champ images sans image");
+});
+
+test("images invalides : 400 (nombre, type, forme)", async () => {
+  const img = "data:image/png;base64,AAAA";
+  assert.equal((await post("/api/generate", { prompt: "x", images: [img, img, img, img] })).status, 400);
+  assert.equal((await post("/api/generate", { prompt: "x", images: ["data:text/html;base64,AAAA"] })).status, 400);
+  assert.equal((await post("/api/generate", { prompt: "x", images: "pas-un-tableau" })).status, 400);
+});
