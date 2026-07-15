@@ -188,4 +188,7 @@ test("images invalides : 400 (nombre, type, forme)", async () => {
   assert.equal((await post("/api/generate", { prompt: "x", images: [img, img, img, img] })).status, 400);
   assert.equal((await post("/api/generate", { prompt: "x", images: ["data:text/html;base64,AAAA"] })).status, 400);
   assert.equal((await post("/api/generate", { prompt: "x", images: "pas-un-tableau" })).status, 400);
+
+  const trop = "data:image/png;base64," + "A".repeat(2 * 1024 * 1024);
+  assert.equal((await post("/api/generate", { prompt: "x", images: [trop] })).status, 400);
 });

@@ -200,6 +200,13 @@
   .composer-hint:empty { display: none; }
   .composer.drag-over textarea { outline: 2px dashed var(--accent); outline-offset: 1px; }
   .bubble .bubble-images { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .bubble .bubble-images .bubble-image-btn {
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    display: block;
+  }
   .bubble .bubble-images img {
     width: 72px; height: 72px;
     object-fit: cover;
@@ -528,11 +535,16 @@
       const zone = document.createElement("div");
       zone.className = "bubble-images";
       images.forEach((url, i) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "bubble-image-btn";
+        btn.setAttribute("aria-label", `Ouvrir l'image jointe ${i + 1} dans un onglet`);
         const img = document.createElement("img");
         img.src = url;
-        img.alt = `Image jointe ${i + 1}`;
-        img.addEventListener("click", () => ouvrirImage(url));
-        zone.appendChild(img);
+        img.alt = "";
+        btn.appendChild(img);
+        btn.addEventListener("click", () => ouvrirImage(url));
+        zone.appendChild(btn);
       });
       bubble.appendChild(zone);
     }
