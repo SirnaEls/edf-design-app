@@ -350,7 +350,7 @@
       <p class="composer-hint" id="composerHint" role="status"></p>
       <div class="composer">
         <button class="btn-ghost btn-attach" id="attachBtn" aria-label="Joindre une image (wireframe, maquette)" title="Joindre une image">📎</button>
-        <input type="file" id="fileInput" class="sr-only" accept="image/png,image/jpeg,image/webp" multiple />
+        <input type="file" id="fileInput" class="sr-only" accept="image/png,image/jpeg,image/webp" multiple tabindex="-1" />
         <label for="prompt" class="sr-only">Décris l'interface ou la modification</label>
         <textarea id="prompt" rows="1" placeholder="Décris l'interface ou la modification…"></textarea>
         <button class="btn-primary" id="generateBtn">Générer</button>
@@ -619,7 +619,15 @@
     return canvas.toDataURL("image/jpeg", 0.85);
   }
 
-  async function ajouterImages(fichiers) {
+  // Sérialise les ajouts : deux collages/drops rapprochés ne peuvent pas
+  // se doubler pendant la compression et dépasser MAX_IMAGES
+  let ajoutEnCours = Promise.resolve();
+  function ajouterImages(fichiers) {
+    ajoutEnCours = ajoutEnCours.then(() => ajouterImagesSeq(fichiers));
+    return ajoutEnCours;
+  }
+
+  async function ajouterImagesSeq(fichiers) {
     for (const f of fichiers) {
       if (!/^image\/(png|jpeg|webp)$/.test(f.type)) { hint(`« ${f.name} » ignoré : seuls PNG, JPEG et WebP sont acceptés.`); continue; }
       if (f.size > 10 * 1024 * 1024) { hint(`« ${f.name} » ignoré : fichier trop lourd (10 Mo max).`); continue; }
@@ -658,8 +666,13 @@
   }
 
   function ouvrirImage(dataUrl) {
-    // Chrome bloque les data URLs en navigation directe : on passe par une Blob URL
-    fetch(dataUrl).then((r) => r.blob()).then((b) => window.open(URL.createObjectURL(b), "_blank"));
+    // Chrome bloque les data URLs en navigation directe : on passe par une Blob URL,
+    // révoquée après ouverture (l'onglet garde son contenu, l'URL n'est plus nécessaire)
+    fetch(dataUrl).then((r) => r.blob()).then((b) => {
+      const u = URL.createObjectURL(b);
+      window.open(u, "_blank");
+      setTimeout(() => URL.revokeObjectURL(u), 60000);
+    });
   }
 
   $("attachBtn").addEventListener("click", () => $("fileInput").click());
@@ -772,7 +785,7 @@
         // Restitue les images au composer : Réessayer comme une reformulation
         // repartent avec — sauf si l'utilisateur en a déjà rajouté entre-temps
         if (!imagesEnAttente.length) {
-          imagesEnAttente = pending.images || [];
+          imagesEnAttente = (pending.images || []).slice(); // copie : la bulle figée garde les siennes
           renderAttachments();
         }
         renderThread();
