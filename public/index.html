@@ -279,7 +279,7 @@
   <div class="logo">EDF <span>Design</span></div>
   <div class="badge" id="modelBadge">portail IAG · stream tolérant</div>
   <div class="header-actions">
-    <button class="btn-ghost" id="sessionsBtn" aria-haspopup="dialog">Sessions</button>
+    <button class="btn-ghost" id="sessionsBtn" aria-haspopup="dialog" aria-expanded="false">Sessions</button>
     <button class="btn-ghost" id="newSessionBtn">Nouveau design</button>
     <button class="btn-ghost" id="copyBtn" disabled>Copier le code</button>
     <button class="btn-ghost" id="downloadBtn" disabled>Télécharger .html</button>
@@ -514,6 +514,17 @@
     thread.appendChild(card);
   }
 
+  // Met à jour la carte d'activité en place, sans reconstruire le fil :
+  // préserve le focus clavier et la live region role="status" pendant le polling.
+  function majCarteActivite() {
+    const card = $("thread").querySelector(".activity");
+    if (!card) { renderThread(); return; }
+    const secs = Math.round((Date.now() - pending.startedAt) / 1000);
+    card.querySelector(".a-label").textContent = PHASE_LABELS[pending.phase] || PHASE_LABELS.attente;
+    card.querySelector(".a-meta").textContent =
+      pending.chars > 0 ? `${pending.chars.toLocaleString("fr-FR")} car. · ${secs} s` : `${secs} s`;
+  }
+
   function selectVersion(i) {
     activeIndex = i;
     // Blob URL plutôt que srcdoc : contexte d'exécution normal, Tailwind CDN
@@ -531,14 +542,14 @@
 
   async function generate() {
     const prompt = $("prompt").value.trim();
-    if (!prompt || pending) return;
+    if (!prompt || (pending && !pending.error)) return;
     const requestSessionId = currentSessionId;
     let aNavigue = false;
     const gid = crypto.randomUUID();
     pending = {
       prompt, gid,
       startedAt: Date.now(), phase: "attente", chars: 0, error: null,
-      retry: () => { $("prompt").value = prompt; generate(); },
+      retry: () => { if (!$("prompt").value.trim()) $("prompt").value = prompt; generate(); },
     };
     $("generateBtn").disabled = true;
     $("prompt").disabled = true;
@@ -558,7 +569,7 @@
           pending.chars = j.chars;
         }
       } catch { /* réseau : on garde le temps écoulé local */ }
-      if (pending && pending.gid === gid && currentSessionId === requestSessionId && !pending.error) renderThread();
+      if (pending && pending.gid === gid && currentSessionId === requestSessionId && !pending.error) majCarteActivite();
     }, 500);
 
     try {
@@ -640,12 +651,14 @@
     drawerReturnFocus = document.activeElement;
     $("drawer").classList.remove("hidden");
     $("drawerBackdrop").classList.remove("hidden");
+    $("sessionsBtn").setAttribute("aria-expanded", "true");
     $("drawerCloseBtn").focus();
   }
 
   function closeDrawer() {
     $("drawer").classList.add("hidden");
     $("drawerBackdrop").classList.add("hidden");
+    $("sessionsBtn").setAttribute("aria-expanded", "false");
     if (drawerReturnFocus) drawerReturnFocus.focus();
   }
 
@@ -689,6 +702,7 @@
   (async function init() {
     await loadSessionList();
     if (sessions.length) openSession(sessions[0].id);
+    else renderThread();
   })();
 </script>
 </body>
